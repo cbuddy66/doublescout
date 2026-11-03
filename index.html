@@ -19,6 +19,7 @@
 <div id="status">Laden…</div>
 <div class="card"><div class="box"><canvas id="tempChart"></canvas></div></div>
 <div class="card"><div class="box"><canvas id="spreadChart"></canvas></div></div>
+<div class="card"><div class="box"><canvas id="factorChart"></canvas></div></div>
 
 <script>
 // Pad uit main scout.cpp: path + "/Settings/24H/<i>/Temp|SpreadAvg", i = uur*5 + minuut/12
@@ -49,6 +50,10 @@ function makeChart(id, label, color, unit) {
 const tempChart = makeChart("tempChart", "Temperatuur", "#d84315", "°C");
 const spreadChart = makeChart("spreadChart", "SpreadAvg", "#1565c0", "SpreadAvg");
 
+const factorChart = makeChart("factorChart", "scoutCoolFactor", "#00897b", "Factor");
+factorChart.data.datasets.push({ label: "scoutHeatFactor", data: [], borderColor: "#f9a825", backgroundColor: "#f9a825",
+                                 pointRadius: 1, borderWidth: 2, tension: 0.2, spanGaps: true });
+
 // Waarden <= 0 (en temp >= 100) zijn lege/ongeldige slots
 function series(data, key, valid) {
   return labels.map((_, i) => {
@@ -65,7 +70,9 @@ async function load() {
     const data = await res.json() || {};
     tempChart.data.datasets[0].data = series(data, "Temp", v => v > 0 && v < 100);
     spreadChart.data.datasets[0].data = series(data, "SpreadAvg", v => v > 0);
-    tempChart.update(); spreadChart.update();
+    factorChart.data.datasets[0].data = series(data, "scoutCoolFactor", () => true);
+    factorChart.data.datasets[1].data = series(data, "scoutHeatFactor", () => true);
+    tempChart.update(); spreadChart.update(); factorChart.update();
     status.className = "";
     status.textContent = "Bijgewerkt: " + new Date().toLocaleTimeString("nl-NL");
   } catch (e) {
