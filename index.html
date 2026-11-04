@@ -32,6 +32,27 @@ const labels = Array.from({ length: 120 }, (_, i) => {
   return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
 });
 
+// Verticale lijn op het huidige tijdstip (index = uur*5 + minuut/12, zoals in de firmware)
+Chart.register({
+  id: "nowLine",
+  afterDatasetsDraw(chart) {
+    const d = new Date();
+    const idx = d.getHours() * 5 + (d.getMinutes() + d.getSeconds() / 60) / 12;
+    const { ctx, chartArea, scales } = chart;
+    const x = scales.x.getPixelForValue(idx);
+    if (x < chartArea.left || x > chartArea.right) return;
+    ctx.save();
+    ctx.strokeStyle = "#444";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(x, chartArea.top);
+    ctx.lineTo(x, chartArea.bottom);
+    ctx.stroke();
+    ctx.restore();
+  }
+});
+
 function makeChart(id, label, color, unit) {
   return new Chart(document.getElementById(id), {
     type: "line",
