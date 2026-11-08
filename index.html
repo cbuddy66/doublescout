@@ -1,108 +1,202 @@
 <!DOCTYPE html>
 <html lang="nl">
+
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DoubleScout – 24 uur</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<style>
-  body { font-family: system-ui, sans-serif; margin: 0; padding: 1rem; background: #f4f6f8; color: #222; }
-  h1 { font-size: 1.3rem; margin: 0 0 .5rem; }
-  .card { background: #fff; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 1px 3px #0002; }
-  .box { position: relative; height: 300px; }
-  #status { font-size: .85rem; color: #666; margin-bottom: .5rem; }
-  #status.err { color: #b00020; }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DoubleScout – 24 uur</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      padding: 1rem;
+      background: #f4f6f8;
+      color: #222;
+    }
+
+    h1 {
+      font-size: 1.3rem;
+      margin: 0 0 .5rem;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 1px 3px #0002;
+    }
+
+    .box {
+      position: relative;
+      height: 300px;
+    }
+
+    .current-values {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: .5rem 1.5rem;
+      margin-top: .75rem;
+      text-align: center;
+    }
+
+    #status {
+      font-size: .85rem;
+      color: #666;
+      margin-bottom: .5rem;
+    }
+
+    #status.err {
+      color: #b00020;
+    }
+  </style>
 </head>
+
 <body>
-<h1>DoubleScout – laatste 24 uur</h1>
-<div id="status">Laden…</div>
-<div class="card"><div class="box"><canvas id="tempChart"></canvas></div></div>
-<div class="card"><div class="box"><canvas id="spreadChart"></canvas></div></div>
-<div class="card"><div class="box"><canvas id="factorChart"></canvas></div></div>
+  <h1>DoubleScout – laatste 24 uur</h1>
+  <div id="status">Laden…</div>
+  <div class="card">
+    <div class="box"><canvas id="tempChart"></canvas></div>
+    <div class="current-values">
+      <span>Temp: <span id="currentTemp">—</span></span>
+      <span>TempSet: <span id="currentTempSet">—</span></span>
+      <span>Verschil: <span id="currentTempDiff">—</span></span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="box"><canvas id="spreadChart"></canvas></div>
+    <div class="current-values">
+      <span>SpreadAVG: <span id="currentSpreadAvg">—</span></span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="box"><canvas id="factorChart"></canvas></div>
+    <div class="current-values">
+      <span>scoutCoolFactor: <span id="currentScoutCoolFactor">—</span></span>
+      <span>scoutHeatFactor: <span id="currentScoutHeatFactor">—</span></span>
+    </div>
+  </div>
 
-<script>
-// Pad uit main scout.cpp: path + "/Settings/24H/<i>/Temp|SpreadAvg", i = uur*5 + minuut/12
-const DB = "https://controller-cfc4c-default-rtdb.europe-west1.firebasedatabase.app";
-const URL24H = DB + "/DoubleScout/Settings/24H.json";
-const REFRESH_MS = 6 * 60 * 1000;
+  <script>
+    // Pad uit main scout.cpp: path + "/Settings/24H/<i>/Temp|SpreadAvg", i = uur*5 + minuut/12
+    const DB = "https://controller-cfc4c-default-rtdb.europe-west1.firebasedatabase.app";
+    const URL24H = DB + "/DoubleScout/Settings/24H.json";
+    const URL_CURRENT = DB + "/DoubleScout/Current.json";
+    const URL_TEMPSET = DB + "/DoubleScout/Settings/TempSet.json";
+    const REFRESH_MS = 6 * 60 * 1000;
 
-const labels = Array.from({ length: 120 }, (_, i) => {
-  const h = Math.floor(i / 5), m = (i % 5) * 12;
-  return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
-});
+    const labels = Array.from({ length: 120 }, (_, i) => {
+      const h = Math.floor(i / 5), m = (i % 5) * 12;
+      return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
+    });
 
-// Verticale lijn op het huidige tijdstip (index = uur*5 + minuut/12, zoals in de firmware)
-Chart.register({
-  id: "nowLine",
-  afterDatasetsDraw(chart) {
-    const d = new Date();
-    const idx = d.getHours() * 5 + (d.getMinutes() + d.getSeconds() / 60) / 12;
-    const { ctx, chartArea, scales } = chart;
-    const x = scales.x.getPixelForValue(idx);
-    if (x < chartArea.left || x > chartArea.right) return;
-    ctx.save();
-    ctx.strokeStyle = "#444";
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([6, 4]);
-    ctx.beginPath();
-    ctx.moveTo(x, chartArea.top);
-    ctx.lineTo(x, chartArea.bottom);
-    ctx.stroke();
-    ctx.restore();
-  }
-});
+    // Verticale lijn op het huidige tijdstip (index = uur*5 + minuut/12, zoals in de firmware)
+    Chart.register({
+      id: "nowLine",
+      afterDatasetsDraw(chart) {
+        const d = new Date();
+        const idx = d.getHours() * 5 + (d.getMinutes() + d.getSeconds() / 60) / 12;
+        const { ctx, chartArea, scales } = chart;
+        const x = scales.x.getPixelForValue(idx);
+        if (x < chartArea.left || x > chartArea.right) return;
+        ctx.save();
+        ctx.strokeStyle = "#444";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(x, chartArea.top);
+        ctx.lineTo(x, chartArea.bottom);
+        ctx.stroke();
+        ctx.restore();
+      }
+    });
 
-function makeChart(id, label, color, unit) {
-  return new Chart(document.getElementById(id), {
-    type: "line",
-    data: { labels, datasets: [{ label, data: [], borderColor: color, backgroundColor: color,
-                                 pointRadius: 1, borderWidth: 2, tension: 0.2, spanGaps: true }] },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: { ticks: { maxTicksLimit: 12 } },
-        y: { title: { display: true, text: unit } }
+    function makeChart(id, label, color, unit) {
+      return new Chart(document.getElementById(id), {
+        type: "line",
+        data: {
+          labels, datasets: [{
+            label, data: [], borderColor: color, backgroundColor: color,
+            pointRadius: 1, borderWidth: 2, tension: 0.2, spanGaps: true
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false },
+          scales: {
+            x: { ticks: { maxTicksLimit: 12 } },
+            y: { title: { display: true, text: unit } }
+          }
+        }
+      });
+    }
+    const tempChart = makeChart("tempChart", "Temperatuur", "#d84315", "°C");
+    const spreadChart = makeChart("spreadChart", "SpreadAvg", "#1565c0", "SpreadAvg");
+
+    const factorChart = makeChart("factorChart", "scoutCoolFactor", "#00897b", "Factor");
+    factorChart.data.datasets.push({
+      label: "scoutHeatFactor", data: [], borderColor: "#f9a825", backgroundColor: "#f9a825",
+      pointRadius: 1, borderWidth: 2, tension: 0.2, spanGaps: true
+    });
+
+    // Waarden <= 0 (en temp >= 100) zijn lege/ongeldige slots
+    function series(data, key, valid) {
+      return labels.map((_, i) => {
+        const v = data[i] && data[i][key];
+        return typeof v === "number" && valid(v) ? v : null;
+      });
+    }
+
+    function formatValue(value, unit) {
+      return typeof value === "number" && Number.isFinite(value)
+        ? value.toLocaleString("nl-NL", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + (unit ? " " + unit : "")
+        : "—";
+    }
+
+    async function fetchJson(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("HTTP " + res.status + (res.status === 401 ? " (leesrechten Firebase ontbreken)" : ""));
+      return res.json();
+    }
+
+    async function load() {
+      const status = document.getElementById("status");
+      try {
+        const [data, current, tempSet] = await Promise.all([
+          fetchJson(URL24H),
+          fetchJson(URL_CURRENT),
+          fetchJson(URL_TEMPSET)
+        ]);
+        const history = data || {};
+        const temp = current && current.Temp;
+
+        tempChart.data.datasets[0].data = series(history, "Temp", v => v > 0 && v < 100);
+        spreadChart.data.datasets[0].data = series(history, "SpreadAvg", v => v > 0);
+        factorChart.data.datasets[0].data = series(history, "scoutCoolFactor", () => true);
+        factorChart.data.datasets[1].data = series(history, "scoutHeatFactor", () => true);
+        tempChart.update(); spreadChart.update(); factorChart.update();
+        document.getElementById("currentTemp").textContent = formatValue(temp, "°C");
+        document.getElementById("currentTempSet").textContent = formatValue(tempSet, "°C");
+        document.getElementById("currentTempDiff").textContent =
+          typeof temp === "number" && Number.isFinite(temp) &&
+          typeof tempSet === "number" && Number.isFinite(tempSet)
+            ? formatValue(temp - tempSet, "°C")
+            : "—";
+        document.getElementById("currentSpreadAvg").textContent = formatValue(current && current.SpreadAvg, "");
+        document.getElementById("currentScoutCoolFactor").textContent = formatValue(current && current.scoutCoolFactor, "");
+        document.getElementById("currentScoutHeatFactor").textContent = formatValue(current && current.scoutHeatFactor, "");
+        status.className = "";
+        status.textContent = "Bijgewerkt: " + new Date().toLocaleTimeString("nl-NL");
+      } catch (e) {
+        status.className = "err";
+        status.textContent = "Fout bij laden: " + e.message;
       }
     }
-  });
-}
-const tempChart = makeChart("tempChart", "Temperatuur", "#d84315", "°C");
-const spreadChart = makeChart("spreadChart", "SpreadAvg", "#1565c0", "SpreadAvg");
-
-const factorChart = makeChart("factorChart", "scoutCoolFactor", "#00897b", "Factor");
-factorChart.data.datasets.push({ label: "scoutHeatFactor", data: [], borderColor: "#f9a825", backgroundColor: "#f9a825",
-                                 pointRadius: 1, borderWidth: 2, tension: 0.2, spanGaps: true });
-
-// Waarden <= 0 (en temp >= 100) zijn lege/ongeldige slots
-function series(data, key, valid) {
-  return labels.map((_, i) => {
-    const v = data[i] && data[i][key];
-    return typeof v === "number" && valid(v) ? v : null;
-  });
-}
-
-async function load() {
-  const status = document.getElementById("status");
-  try {
-    const res = await fetch(URL24H);
-    if (!res.ok) throw new Error("HTTP " + res.status + (res.status === 401 ? " (leesrechten Firebase ontbreken)" : ""));
-    const data = await res.json() || {};
-    tempChart.data.datasets[0].data = series(data, "Temp", v => v > 0 && v < 100);
-    spreadChart.data.datasets[0].data = series(data, "SpreadAvg", v => v > 0);
-    factorChart.data.datasets[0].data = series(data, "scoutCoolFactor", () => true);
-    factorChart.data.datasets[1].data = series(data, "scoutHeatFactor", () => true);
-    tempChart.update(); spreadChart.update(); factorChart.update();
-    status.className = "";
-    status.textContent = "Bijgewerkt: " + new Date().toLocaleTimeString("nl-NL");
-  } catch (e) {
-    status.className = "err";
-    status.textContent = "Fout bij laden: " + e.message;
-  }
-}
-load();
-setInterval(load, REFRESH_MS);
-</script>
+    load();
+    setInterval(load, REFRESH_MS);
+  </script>
 </body>
+
 </html>
