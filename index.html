@@ -83,7 +83,7 @@
     // Pad uit main scout.cpp: path + "/Settings/24H/<i>/Temp|SpreadAvg", i = uur*5 + minuut/12
     const DB = "https://controller-cfc4c-default-rtdb.europe-west1.firebasedatabase.app";
     const URL24H = DB + "/DoubleScout/Settings/24H.json";
-    const URL_CURRENT = DB + "/DoubleScout/Current.json";
+    const URL_CURRENT = DB + "/DoubleScout/Current";
     const URL_TEMPSET = DB + "/DoubleScout/Settings/TempSet.json";
     const REFRESH_MS = 6 * 60 * 1000;
 
@@ -164,13 +164,15 @@
     async function load() {
       const status = document.getElementById("status");
       try {
-        const [data, current, tempSet] = await Promise.all([
+        const [data, temp, tempSet, spreadAvg, scoutCoolFactor, scoutHeatFactor] = await Promise.all([
           fetchJson(URL24H),
-          fetchJson(URL_CURRENT),
-          fetchJson(URL_TEMPSET)
+          fetchJson(URL_CURRENT + "/Temp.json"),
+          fetchJson(URL_TEMPSET),
+          fetchJson(URL_CURRENT + "/SpreadAvg.json"),
+          fetchJson(URL_CURRENT + "/scoutCoolFactor.json"),
+          fetchJson(URL_CURRENT + "/scoutHeatFactor.json")
         ]);
         const history = data || {};
-        const temp = current && current.Temp;
 
         tempChart.data.datasets[0].data = series(history, "Temp", v => v > 0 && v < 100);
         spreadChart.data.datasets[0].data = series(history, "SpreadAvg", v => v > 0);
@@ -184,9 +186,9 @@
           typeof tempSet === "number" && Number.isFinite(tempSet)
             ? formatValue(temp - tempSet, "°C")
             : "—";
-        document.getElementById("currentSpreadAvg").textContent = formatValue(current && current.SpreadAvg, "");
-        document.getElementById("currentScoutCoolFactor").textContent = formatValue(current && current.scoutCoolFactor, "");
-        document.getElementById("currentScoutHeatFactor").textContent = formatValue(current && current.scoutHeatFactor, "");
+        document.getElementById("currentSpreadAvg").textContent = formatValue(spreadAvg, "");
+        document.getElementById("currentScoutCoolFactor").textContent = formatValue(scoutCoolFactor, "");
+        document.getElementById("currentScoutHeatFactor").textContent = formatValue(scoutHeatFactor, "");
         status.className = "";
         status.textContent = "Bijgewerkt: " + new Date().toLocaleTimeString("nl-NL");
       } catch (e) {
