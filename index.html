@@ -149,9 +149,9 @@
       });
     }
 
-    function formatValue(value, unit) {
+    function formatValue(value, unit, decimals = 1) {
       return typeof value === "number" && Number.isFinite(value)
-        ? value.toLocaleString("nl-NL", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + (unit ? " " + unit : "")
+        ? value.toLocaleString("nl-NL", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + (unit ? " " + unit : "")
         : "—";
     }
 
@@ -186,7 +186,7 @@
           typeof tempSet === "number" && Number.isFinite(tempSet)
             ? formatValue(temp - tempSet, "°C")
             : "—";
-        document.getElementById("currentSpreadAvg").textContent = formatValue(spreadAvg, "");
+        document.getElementById("currentSpreadAvg").textContent = formatValue(spreadAvg, "°C", 3);
         document.getElementById("currentScoutCoolFactor").textContent = formatValue(scoutCoolFactor, "");
         document.getElementById("currentScoutHeatFactor").textContent = formatValue(scoutHeatFactor, "");
         status.className = "";
