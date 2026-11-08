@@ -184,7 +184,7 @@
         document.getElementById("currentTempDiff").textContent =
           typeof temp === "number" && Number.isFinite(temp) &&
           typeof tempSet === "number" && Number.isFinite(tempSet)
-            ? formatValue(temp - tempSet, "°C")
+            ? formatValue(temp - tempSet, "°C", temp < tempSet + 0.2 ? 2 : 1)
             : "—";
         document.getElementById("currentSpreadAvg").textContent = formatValue(spreadAvg, "°C", 3);
         document.getElementById("currentScoutCoolFactor").textContent = formatValue(scoutCoolFactor, "");
